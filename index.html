@@ -4,11 +4,17 @@
   <meta charset="UTF-8" />
   <title>만 나이 계산기</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #333; padding: 5px; text-align: center; }
+    th { background-color: #f0f0f0; }
+  </style>
 </head>
 <body>
 
-<h2>엑셀 업로드</h2>
+<h2>엑셀 업로드 (출생연도 기준 만나이 계산)</h2>
 <input type="file" id="upload" />
+<div id="resultTable"></div>
 
 <script>
 document.getElementById('upload').addEventListener('change', function(e) {
@@ -18,24 +24,44 @@ document.getElementById('upload').addEventListener('change', function(e) {
     const workbook = XLSX.read(data, {type: 'array'});
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(sheet);
-    console.log(json[0]);
 
-    
     const today = new Date();
     const currentYear = today.getFullYear();
 
+    // 엑셀 컬럼명에 맞게 바꿔주세요. 예: "I" 또는 "출생년도"
+    const birthCol = "출생연도";
+
     const result = json.map(row => {
-      // 실제 출생년도 컬럼명에 맞게 바꾸세요
-      const birthYear = row["I"] || row["출생년도"] || row["Year"] || null;
+      const birthYear = row[birthCol] || null;
       const age = birthYear ? currentYear - birthYear : null;
-      return {
-        ...row,
-        만나이: age
-      };
+      return {...row, 만나이: age};
     });
 
-    console.log(result);
-    alert("첫 5명 만나이: " + result.slice(0,5).map(r => r.만나이).join(", "));
+    // 웹페이지에 표로 출력
+    const tableDiv = document.getElementById('resultTable');
+    if(result.length === 0){
+      tableDiv.innerHTML = "<p>데이터가 없습니다.</p>";
+      return;
+    }
+
+    let html = '<table>';
+    // 헤더
+    html += '<tr>';
+    for (const key in result[0]) {
+      html += `<th>${key}</th>`;
+    }
+    html += '</tr>';
+    // 데이터 행
+    result.forEach(row => {
+      html += '<tr>';
+      for (const key in row) {
+        html += `<td>${row[key] !== undefined ? row[key] : ""}</td>`;
+      }
+      html += '</tr>';
+    });
+    html += '</table>';
+    tableDiv.innerHTML = html;
+
   };
   reader.readAsArrayBuffer(e.target.files[0]);
 });
