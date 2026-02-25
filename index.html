@@ -19,6 +19,7 @@ document.getElementById('upload').addEventListener('change', function(e) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(sheet);
     console.log(json[0]);
+
     
     const today = new Date();
     const currentYear = today.getFullYear();
