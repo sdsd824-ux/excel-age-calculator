@@ -28,7 +28,6 @@ document.getElementById('upload').addEventListener('change', function(e) {
     const today = new Date();
     const currentYear = today.getFullYear();
 
-    // 엑셀 컬럼명에 맞게 바꿔주세요. 예: "I" 또는 "출생년도"
     const birthCol = "출생연도";
 
     const result = json.map(row => {
