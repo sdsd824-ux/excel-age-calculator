@@ -1,51 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>환자 내원 분석</title>
+<title>내원 분석 시스템</title>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 
 body{
-font-family: Arial;
-background:#f6f7fb;
+font-family: "Segoe UI", Arial;
+background:#f5f7fb;
+margin:0;
+padding:40px;
+}
+
+.container{
+max-width:1200px;
+margin:auto;
+}
+
+.title{
 text-align:center;
-padding:40px;
+margin-bottom:30px;
 }
 
-h1{
-margin-bottom:10px;
+.title h1{
+margin:0;
+font-size:34px;
 }
 
-#drop{
-width:420px;
-margin:30px auto;
-padding:40px;
-border:2px dashed #bfc6d1;
-border-radius:10px;
+.title p{
+color:#666;
+margin-top:8px;
+}
+
+.upload-box{
+display:flex;
+gap:20px;
+justify-content:center;
+margin-bottom:30px;
+}
+
+.drop{
+flex:1;
 background:white;
+border:2px dashed #cfd6e0;
+padding:40px;
+text-align:center;
+border-radius:10px;
+cursor:pointer;
+transition:0.2s;
+}
+
+.drop:hover{
+background:#f0f4ff;
+}
+
+.stats{
+display:flex;
+gap:20px;
+margin-bottom:25px;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+flex:1;
+box-shadow:0 2px 6px rgba(0,0,0,0.05);
+}
+
+.card h3{
+margin:0 0 10px 0;
+font-size:16px;
+color:#666;
+}
+
+.card p{
+font-size:24px;
+margin:0;
+font-weight:bold;
 }
 
 table{
+width:100%;
 border-collapse:collapse;
-margin:40px auto;
 background:white;
-}
-
-th,td{
-border:1px solid #ddd;
-padding:8px 14px;
+border-radius:10px;
+overflow:hidden;
 }
 
 th{
-background:#f2f4f8;
+background:#eef2f8;
+padding:12px;
+font-weight:600;
+}
+
+td{
+padding:10px;
+border-top:1px solid #eee;
+text-align:center;
 }
 
 .one{
-background:#ffecec;
+background:#ffeaea;
 font-weight:bold;
+}
+
+.filter{
+margin:20px 0;
 }
 
 </style>
@@ -53,27 +117,64 @@ font-weight:bold;
 
 <body>
 
-<h1>환자 내원 분석</h1>
-<p>엑셀 파일을 넣으면 자동 분석됩니다</p>
+<div class="container">
 
-<div id="drop">
-파일을 드래그하거나 클릭해서 업로드<br><br>
+<div class="title">
+<h1>내원 분석 시스템</h1>
+<p>엑셀 파일을 업로드하면 자동으로 분석됩니다</p>
+</div>
+
+<div class="upload-box">
+<div class="drop" id="drop">
+파일 드래그 또는 클릭 업로드<br><br>
 <input type="file" id="upload">
+</div>
+</div>
+
+<div class="stats">
+<div class="card">
+<h3>전체 환자</h3>
+<p id="totalPatients">0</p>
+</div>
+
+<div class="card">
+<h3>재방문 환자</h3>
+<p id="returnPatients">0</p>
+</div>
+
+<div class="card">
+<h3>재방문율</h3>
+<p id="returnRate">0%</p>
+</div>
+</div>
+
+<div class="filter">
+N차 필터
+<select id="visitFilter">
+<option value="all">전체</option>
+<option value="1">1회</option>
+<option value="2">2회</option>
+<option value="3">3회 이상</option>
+</select>
 </div>
 
 <div id="result"></div>
+
+</div>
 
 <script>
 
 const drop = document.getElementById("drop");
 const upload = document.getElementById("upload");
 
+drop.addEventListener("click",()=>upload.click());
+
 drop.addEventListener("dragover",e=>{
 e.preventDefault();
 drop.style.background="#eef2ff";
 });
 
-drop.addEventListener("dragleave",e=>{
+drop.addEventListener("dragleave",()=>{
 drop.style.background="white";
 });
 
@@ -87,9 +188,9 @@ upload.addEventListener("change",e=>{
 handleFile(e.target.files[0]);
 });
 
-function handleFile(file){
+let globalData=[];
 
-if(!file) return;
+function handleFile(file){
 
 const reader = new FileReader();
 
@@ -115,10 +216,7 @@ for(let i=0;i<rows.length;i++){
 let r = rows[i];
 if(!r) continue;
 
-let hasChart = r.includes("차트번호");
-let hasDate = r.includes("내원일");
-
-if(hasChart && hasDate){
+if(r.includes("차트번호") && r.includes("내원일")){
 return i;
 }
 
@@ -130,10 +228,8 @@ return -1;
 
 function excelDateToJS(n){
 
-let utc_days = Math.floor(n - 25569);
-let utc_value = utc_days * 86400;
-let date = new Date(utc_value * 1000);
-return date;
+const d = XLSX.SSF.parse_date_code(n);
+return new Date(d.y,d.m-1,d.d);
 
 }
 
@@ -147,13 +243,11 @@ return excelDateToJS(v);
 
 let s = String(v).trim();
 
-if(s === "") return null;
-
-if(s.includes("내원일")) return null;
+if(s==="" || s.includes("내원일")) return null;
 
 let d = new Date(s);
 
-if(isNaN(d.getTime())) return null;
+if(isNaN(d)) return null;
 
 return d;
 
@@ -162,100 +256,138 @@ return d;
 function processRows(rows){
 
 let headerIndex = findHeader(rows);
-
-if(headerIndex === -1){
-alert("헤더를 찾지 못했습니다");
-return;
-}
-
 let header = rows[headerIndex];
 
 let chartIndex = header.indexOf("차트번호");
 let nameIndex = header.indexOf("수진자명");
 let visitIndex = header.indexOf("내원일");
 
-let map = {};
+let map={};
 
-for(let i = headerIndex + 1; i < rows.length; i++){
+for(let i=headerIndex+1;i<rows.length;i++){
 
-let r = rows[i];
+let r=rows[i];
 if(!r) continue;
 
-let chart = r[chartIndex];
-let name = r[nameIndex];
-let rawDate = r[visitIndex];
+let chart=r[chartIndex];
+let name=r[nameIndex];
+let raw=r[visitIndex];
 
 if(!chart) continue;
-
 if(String(chart).includes("차트번호")) continue;
 
-let visit = safeDate(rawDate);
-if(!visit) continue;
+let date=safeDate(raw);
+if(!date) continue;
 
 if(!map[chart]){
-map[chart] = {
-name:name,
-visits:[]
-};
+map[chart]={name:name,visits:[]};
 }
 
-map[chart].visits.push(visit);
+map[chart].visits.push(date);
 
 }
 
-let result = [];
+let result=[];
+let today=new Date();
+today.setHours(0,0,0,0);
 
-for(let chart in map){
+for(let c in map){
 
-let visits = map[chart].visits.sort((a,b)=>a-b);
+let visits=map[c].visits.sort((a,b)=>a-b);
 
-let first = visits[0];
-let last = visits[visits.length-1];
+let first=visits[0];
+let last=visits[visits.length-1];
+
+let gap="-";
+
+if(visits.length>1){
+
+let total=0;
+
+for(let i=1;i<visits.length;i++){
+total+= (visits[i]-visits[i-1]) / 86400000;
+}
+
+gap=(total/(visits.length-1)).toFixed(1);
+
+}
+
+let diff=Math.floor((today-last)/86400000);
 
 result.push({
-chart:chart,
-name:map[chart].name,
+chart:c,
+name:map[c].name,
 count:visits.length,
-first:first ? first.toISOString().slice(0,10) : "",
-last:last ? last.toISOString().slice(0,10) : ""
+first:first.toISOString().slice(0,10),
+last:last.toISOString().slice(0,10),
+gap:gap,
+diff:diff
 });
 
 }
 
-render(result);
+globalData=result;
+
+renderStats(result);
+renderTable(result);
 
 }
 
-function render(data){
+function renderStats(data){
 
-const div = document.getElementById("result");
+let total=data.length;
+let returns=data.filter(d=>d.count>1).length;
+let rate=((returns/total)*100).toFixed(1);
 
-if(data.length === 0){
-div.innerHTML="결과 없음";
-return;
+document.getElementById("totalPatients").innerText=total;
+document.getElementById("returnPatients").innerText=returns;
+document.getElementById("returnRate").innerText=rate+"%";
+
 }
+
+document.getElementById("visitFilter").addEventListener("change",()=>{
+
+let v=document.getElementById("visitFilter").value;
+
+let filtered=globalData;
+
+if(v==="1") filtered=globalData.filter(d=>d.count===1);
+if(v==="2") filtered=globalData.filter(d=>d.count===2);
+if(v==="3") filtered=globalData.filter(d=>d.count>=3);
+
+renderTable(filtered);
+
+});
+
+function renderTable(data){
 
 let html="<table>";
 
-html+="<tr>";
-html+="<th>차트번호</th>";
-html+="<th>수진자명</th>";
-html+="<th>방문횟수</th>";
-html+="<th>첫 방문</th>";
-html+="<th>마지막 방문</th>";
-html+="</tr>";
+html+=`
+<tr>
+<th>차트번호</th>
+<th>수진자명</th>
+<th>첫 방문</th>
+<th>마지막 방문</th>
+<th>총 방문</th>
+<th>평균 방문간격</th>
+<th>마지막 방문후 경과일</th>
+</tr>
+`;
 
 data.forEach(r=>{
 
-let cls = r.count === 1 ? "class='one'" : "";
+let cls=r.count===1?"class='one'":"";
 
 html+=`
 <tr ${cls}>
 <td>${r.chart}</td>
 <td>${r.name}</td>
-<td>${r.count}</td>
 <td>${r.first}</td>
 <td>${r.last}</td>
+<td>${r.count}</td>
+<td>${r.gap}</td>
+<td>${r.diff}</td>
 </tr>
 `;
 
@@ -263,7 +395,7 @@ html+=`
 
 html+="</table>";
 
-div.innerHTML=html;
+document.getElementById("result").innerHTML=html;
 
 }
 
