@@ -2,47 +2,50 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>환자 재내원 분석</title>
+<title>환자 내원 분석</title>
+
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 
 body{
 font-family: Arial;
-margin:40px;
+background:#f6f7fb;
+text-align:center;
+padding:40px;
+}
+
+h1{
+margin-bottom:10px;
 }
 
 #drop{
-border:2px dashed #999;
+width:420px;
+margin:30px auto;
 padding:40px;
-text-align:center;
-cursor:pointer;
+border:2px dashed #bfc6d1;
+border-radius:10px;
+background:white;
 }
 
 table{
-border-collapse: collapse;
-width:100%;
-margin-top:20px;
+border-collapse:collapse;
+margin:40px auto;
+background:white;
 }
 
 th,td{
-border:1px solid #333;
-padding:6px;
-text-align:center;
+border:1px solid #ddd;
+padding:8px 14px;
 }
 
 th{
-background:#f2f2f2;
+background:#f2f4f8;
 }
 
-.once{
-background:#ffe6e6;
+.one{
+background:#ffecec;
 font-weight:bold;
-}
-
-.stat{
-margin-top:20px;
-font-size:18px;
 }
 
 </style>
@@ -50,59 +53,54 @@ font-size:18px;
 
 <body>
 
-<h2>엑셀 업로드</h2>
+<h1>환자 내원 분석</h1>
+<p>엑셀 파일을 넣으면 자동 분석됩니다</p>
 
 <div id="drop">
-파일 드래그 또는 클릭 업로드
-<input type="file" id="file" style="display:none">
+파일을 드래그하거나 클릭해서 업로드<br><br>
+<input type="file" id="upload">
 </div>
-
-<div class="stat" id="stats"></div>
-
-<label>N차 필터</label>
-<select id="nFilter">
-<option value="0">전체</option>
-<option value="1">1회</option>
-<option value="2">2회 이상</option>
-<option value="3">3회 이상</option>
-<option value="5">5회 이상</option>
-<option value="10">10회 이상</option>
-</select>
 
 <div id="result"></div>
 
 <script>
 
 const drop = document.getElementById("drop");
-const fileInput = document.getElementById("file");
+const upload = document.getElementById("upload");
 
-drop.onclick=()=>fileInput.click();
-
-drop.ondragover=(e)=>{e.preventDefault();}
-drop.ondrop=(e)=>{
+drop.addEventListener("dragover",e=>{
 e.preventDefault();
+drop.style.background="#eef2ff";
+});
+
+drop.addEventListener("dragleave",e=>{
+drop.style.background="white";
+});
+
+drop.addEventListener("drop",e=>{
+e.preventDefault();
+drop.style.background="white";
 handleFile(e.dataTransfer.files[0]);
-};
+});
 
-fileInput.onchange=(e)=>{
+upload.addEventListener("change",e=>{
 handleFile(e.target.files[0]);
-};
-
-let patientData=[];
+});
 
 function handleFile(file){
 
-const reader=new FileReader();
+if(!file) return;
 
-reader.onload=function(e){
+const reader = new FileReader();
 
-const data=new Uint8Array(e.target.result);
-const wb=XLSX.read(data,{type:"array"});
-const sheet=wb.Sheets[wb.SheetNames[0]];
+reader.onload = function(e){
 
-const rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+const data = new Uint8Array(e.target.result);
+const workbook = XLSX.read(data,{type:"array"});
+const sheet = workbook.Sheets[workbook.SheetNames[0]];
+const rows = XLSX.utils.sheet_to_json(sheet,{header:1});
 
-process(rows);
+processRows(rows);
 
 };
 
@@ -110,160 +108,154 @@ reader.readAsArrayBuffer(file);
 
 }
 
+function findHeader(rows){
+
+for(let i=0;i<rows.length;i++){
+
+let r = rows[i];
+if(!r) continue;
+
+let hasChart = r.includes("차트번호");
+let hasDate = r.includes("내원일");
+
+if(hasChart && hasDate){
+return i;
+}
+
+}
+
+return -1;
+
+}
+
+function excelDateToJS(n){
+
+let utc_days = Math.floor(n - 25569);
+let utc_value = utc_days * 86400;
+let date = new Date(utc_value * 1000);
+return date;
+
+}
+
 function safeDate(v){
 
-if(!v) return null;
+if(v === undefined || v === null) return null;
 
-v=String(v).trim();
+if(typeof v === "number"){
+return excelDateToJS(v);
+}
 
-if(v=="" || v.includes("내원일")) return null;
+let s = String(v).trim();
 
-let d=new Date(v);
+if(s === "") return null;
 
-if(isNaN(d)) return null;
+if(s.includes("내원일")) return null;
+
+let d = new Date(s);
+
+if(isNaN(d.getTime())) return null;
 
 return d;
 
 }
 
-function process(rows){
+function processRows(rows){
 
-let chartIndex=-1;
-let nameIndex=-1;
-let dateIndex=-1;
+let headerIndex = findHeader(rows);
 
-for(let r of rows){
-
-for(let i=0;i<r.length;i++){
-
-let cell=String(r[i]);
-
-if(cell.includes("차트번호")) chartIndex=i;
-if(cell.includes("수진자명")) nameIndex=i;
-if(cell.includes("내원일")) dateIndex=i;
-
+if(headerIndex === -1){
+alert("헤더를 찾지 못했습니다");
+return;
 }
 
-if(chartIndex>-1 && dateIndex>-1) break;
+let header = rows[headerIndex];
 
-}
+let chartIndex = header.indexOf("차트번호");
+let nameIndex = header.indexOf("수진자명");
+let visitIndex = header.indexOf("내원일");
 
-let map={};
+let map = {};
 
-rows.forEach(r=>{
+for(let i = headerIndex + 1; i < rows.length; i++){
 
-let chart=r[chartIndex];
-let name=r[nameIndex];
-let visit=safeDate(r[dateIndex]);
+let r = rows[i];
+if(!r) continue;
 
-if(!chart || !visit) return;
+let chart = r[chartIndex];
+let name = r[nameIndex];
+let rawDate = r[visitIndex];
+
+if(!chart) continue;
+
+if(String(chart).includes("차트번호")) continue;
+
+let visit = safeDate(rawDate);
+if(!visit) continue;
 
 if(!map[chart]){
-
-map[chart]={
-chart:chart,
+map[chart] = {
 name:name,
-dates:[]
+visits:[]
 };
+}
+
+map[chart].visits.push(visit);
 
 }
 
-map[chart].dates.push(visit);
+let result = [];
 
+for(let chart in map){
+
+let visits = map[chart].visits.sort((a,b)=>a-b);
+
+let first = visits[0];
+let last = visits[visits.length-1];
+
+result.push({
+chart:chart,
+name:map[chart].name,
+count:visits.length,
+first:first ? first.toISOString().slice(0,10) : "",
+last:last ? last.toISOString().slice(0,10) : ""
 });
-
-patientData=Object.values(map).map(p=>{
-
-p.dates.sort((a,b)=>a-b);
-
-let first=p.dates[0];
-let last=p.dates[p.dates.length-1];
-let count=p.dates.length;
-
-let gaps=[];
-
-for(let i=1;i<p.dates.length;i++){
-
-gaps.push((p.dates[i]-p.dates[i-1])/(1000*60*60*24));
 
 }
 
-let avgGap=gaps.length? (gaps.reduce((a,b)=>a+b)/gaps.length).toFixed(1):"-";
-
-let today=new Date();
-
-let sinceLast=Math.floor((today-last)/(1000*60*60*24));
-
-let monthMap={};
-
-p.dates.forEach(d=>{
-
-let key=d.getFullYear()+"-"+(d.getMonth()+1);
-
-monthMap[key]=(monthMap[key]||0)+1;
-
-});
-
-return{
-chart:p.chart,
-name:p.name,
-first:first.toISOString().slice(0,10),
-last:last.toISOString().slice(0,10),
-count:count,
-avgGap:avgGap,
-sinceLast:sinceLast,
-months:monthMap
-};
-
-});
-
-render();
+render(result);
 
 }
 
-document.getElementById("nFilter").onchange=render;
+function render(data){
 
-function render(){
+const div = document.getElementById("result");
 
-let n=parseInt(document.getElementById("nFilter").value);
-
-let list=patientData.filter(p=>{
-
-if(n==0) return true;
-
-if(n==1) return p.count==1;
-
-return p.count>=n;
-
-});
+if(data.length === 0){
+div.innerHTML="결과 없음";
+return;
+}
 
 let html="<table>";
 
-html+=`
-<tr>
-<th>차트번호</th>
-<th>수진자명</th>
-<th>첫 방문</th>
-<th>마지막 방문</th>
-<th>총 방문</th>
-<th>평균 방문간격</th>
-<th>마지막 방문후 경과일</th>
-</tr>
-`;
+html+="<tr>";
+html+="<th>차트번호</th>";
+html+="<th>수진자명</th>";
+html+="<th>방문횟수</th>";
+html+="<th>첫 방문</th>";
+html+="<th>마지막 방문</th>";
+html+="</tr>";
 
-list.forEach(p=>{
+data.forEach(r=>{
 
-let cls=p.count==1?"once":"";
+let cls = r.count === 1 ? "class='one'" : "";
 
 html+=`
-<tr class="${cls}">
-<td>${p.chart}</td>
-<td>${p.name||""}</td>
-<td>${p.first}</td>
-<td>${p.last}</td>
-<td>${p.count}</td>
-<td>${p.avgGap}</td>
-<td>${p.sinceLast}</td>
+<tr ${cls}>
+<td>${r.chart}</td>
+<td>${r.name}</td>
+<td>${r.count}</td>
+<td>${r.first}</td>
+<td>${r.last}</td>
 </tr>
 `;
 
@@ -271,47 +263,7 @@ html+=`
 
 html+="</table>";
 
-document.getElementById("result").innerHTML=html;
-
-calcStats();
-
-}
-
-function calcStats(){
-
-let total=patientData.length;
-
-let revisit=patientData.filter(p=>p.count>1).length;
-
-let rate=((revisit/total)*100).toFixed(1);
-
-let monthCount={};
-
-patientData.forEach(p=>{
-
-for(let m in p.months){
-
-monthCount[m]=(monthCount[m]||0)+p.months[m];
-
-}
-
-});
-
-let statHTML=`
-전체 환자 : ${total}명<br>
-재방문 환자 : ${revisit}명<br>
-재방문율 : ${rate}%<br><br>
-`;
-
-statHTML+="월별 치료 횟수<br>";
-
-for(let m in monthCount){
-
-statHTML+=`${m} : ${monthCount[m]}회<br>`;
-
-}
-
-document.getElementById("stats").innerHTML=statHTML;
+div.innerHTML=html;
 
 }
 
