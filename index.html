@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>엑셀 만나이 계산</title>
-
+<title>만 나이 계산 시스템</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
@@ -20,7 +19,13 @@ padding:70px 20px 30px;
 }
 
 .title{
-font-size:26px;
+font-size:28px;
+font-weight:700;
+}
+
+.subtitle{
+color:#666;
+margin-top:10px;
 }
 
 .container{
@@ -28,24 +33,51 @@ width:1000px;
 margin:40px auto;
 }
 
+.upload-wrap{
+display:flex;
+gap:30px;
+}
+
 .upload-box{
+flex:1;
 background:white;
 border:2px dashed #cfcfcf;
 border-radius:14px;
 padding:60px;
 text-align:center;
-transition:.2s;
 cursor:pointer;
+transition:.2s;
 }
 
 .upload-box.dragover{
 background:#eef4ff;
-border-color:#6ea8ff;
+border-color:#4a8cff;
+}
+
+.upload-title{
+font-weight:600;
+font-size:18px;
+}
+
+.upload-desc{
+margin-top:10px;
+color:#777;
+}
+
+#downloadBtn{
+margin-top:20px;
+padding:10px 20px;
+border:none;
+background:#4a8cff;
+color:white;
+border-radius:6px;
+cursor:pointer;
+display:none;
 }
 
 table{
 width:100%;
-border-collapse: collapse;
+border-collapse:collapse;
 margin-top:40px;
 background:white;
 }
@@ -66,16 +98,36 @@ background:#f1f3f5;
 <body>
 
 <div class="header">
-<div class="title">엑셀 만나이 계산</div>
+<div class="title">만 나이 계산 시스템</div>
+<div class="subtitle">엑셀 파일을 업로드하면 자동으로 계산됩니다</div>
 </div>
 
 <div class="container">
 
+<div class="upload-wrap">
+
 <div id="dropZone" class="upload-box">
-파일을 여기에 드래그하거나 클릭하여 업로드
-<br><br>
+
+<div class="upload-title">엑셀 업로드</div>
+<div class="upload-desc">파일을 드래그하거나 클릭하세요</div>
+
 <input type="file" id="upload" hidden>
+
 </div>
+
+<div class="upload-box">
+
+<div class="upload-title">설명</div>
+<div class="upload-desc">
+엑셀에 <b>출생연도</b> 컬럼이 있어야 합니다<br>
+자동으로 만나이가 계산됩니다
+</div>
+
+</div>
+
+</div>
+
+<button id="downloadBtn">엑셀 다운로드</button>
 
 <div id="resultTable"></div>
 
@@ -85,28 +137,32 @@ background:#f1f3f5;
 
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("upload");
+const downloadBtn = document.getElementById("downloadBtn");
 
-dropZone.addEventListener("click",()=>{
-fileInput.click();
-});
+let latestData = [];
 
-fileInput.addEventListener("change",(e)=>{
+/* 브라우저 기본 드롭 방지 */
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => e.preventDefault());
+
+dropZone.addEventListener("click", ()=> fileInput.click());
+
+fileInput.addEventListener("change", e=>{
 handleFile(e.target.files[0]);
 });
 
-dropZone.addEventListener("dragover",(e)=>{
-e.preventDefault();
+dropZone.addEventListener("dragover", ()=>{
 dropZone.classList.add("dragover");
 });
 
-dropZone.addEventListener("dragleave",()=>{
+dropZone.addEventListener("dragleave", ()=>{
 dropZone.classList.remove("dragover");
 });
 
-dropZone.addEventListener("drop",(e)=>{
-e.preventDefault();
+dropZone.addEventListener("drop", e=>{
 dropZone.classList.remove("dragover");
-handleFile(e.dataTransfer.files[0]);
+const file = e.dataTransfer.files[0];
+handleFile(file);
 });
 
 function handleFile(file){
@@ -116,7 +172,7 @@ const reader = new FileReader();
 reader.onload = function(event){
 
 const data = new Uint8Array(event.target.result);
-const workbook = XLSX.read(data,{type:'array'});
+const workbook = XLSX.read(data,{type:"array"});
 const sheet = workbook.Sheets[workbook.SheetNames[0]];
 const json = XLSX.utils.sheet_to_json(sheet);
 
@@ -128,7 +184,11 @@ const age = birthYear ? currentYear - birthYear : "";
 return {...row, 만나이:age};
 });
 
+latestData = result;
+
 renderTable(result);
+
+downloadBtn.style.display = "inline-block";
 
 };
 
@@ -138,32 +198,44 @@ reader.readAsArrayBuffer(file);
 
 function renderTable(data){
 
-if(data.length===0){
-document.getElementById("resultTable").innerHTML="데이터 없음";
+if(data.length === 0){
+document.getElementById("resultTable").innerHTML = "데이터 없음";
 return;
 }
 
-let html="<table>";
+let html = "<table>";
 
-html+="<tr>";
+html += "<tr>";
 for(const key in data[0]){
-html+=`<th>${key}</th>`;
+html += `<th>${key}</th>`;
 }
-html+="</tr>";
+html += "</tr>";
 
 data.forEach(row=>{
-html+="<tr>";
+html += "<tr>";
 for(const key in row){
-html+=`<td>${row[key]??""}</td>`;
+html += `<td>${row[key] ?? ""}</td>`;
 }
-html+="</tr>";
+html += "</tr>";
 });
 
-html+="</table>";
+html += "</table>";
 
-document.getElementById("resultTable").innerHTML=html;
+document.getElementById("resultTable").innerHTML = html;
 
 }
+
+/* 엑셀 다운로드 */
+
+downloadBtn.addEventListener("click", ()=>{
+
+const ws = XLSX.utils.json_to_sheet(latestData);
+const wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, "result");
+
+XLSX.writeFile(wb,"age_result.xlsx");
+
+});
 
 </script>
 
