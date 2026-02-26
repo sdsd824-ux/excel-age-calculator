@@ -37,6 +37,12 @@ text-align:center;
 background:white;
 border-radius:12px;
 margin-bottom:40px;
+transition:.2s;
+}
+
+.upload.dragover{
+background:#eef4ff;
+border-color:#4a7dff;
 }
 
 .stats{
@@ -83,7 +89,7 @@ font-size:18px;
 <h1>환자 내원 분석</h1>
 <div class="sub">엑셀 파일을 넣으면 자동 분석됩니다</div>
 
-<div class="upload">
+<div class="upload" id="dropZone">
 <input type="file" id="excelFile">
 </div>
 
@@ -95,7 +101,9 @@ N차 필터
 <option value="all">전체</option>
 <option value="1">1회</option>
 <option value="2">2회</option>
-<option value="3">3회 이상</option>
+<option value="3">3회</option>
+<option value="4">4회</option>
+<option value="5">5회이상</option>
 </select>
 </div>
 
@@ -116,13 +124,36 @@ N차 필터
 
 <script>
 
-document.getElementById('excelFile').addEventListener('change', handleFile)
+const fileInput = document.getElementById('excelFile')
+const dropZone = document.getElementById('dropZone')
+
+fileInput.addEventListener('change', handleFile)
+
+dropZone.addEventListener("dragover",e=>{
+e.preventDefault()
+dropZone.classList.add("dragover")
+})
+
+dropZone.addEventListener("dragleave",()=>{
+dropZone.classList.remove("dragover")
+})
+
+dropZone.addEventListener("drop",e=>{
+e.preventDefault()
+dropZone.classList.remove("dragover")
+
+const file=e.dataTransfer.files[0]
+readFile(file)
+})
+
+fileInput.addEventListener("change",e=>{
+readFile(e.target.files[0])
+})
 
 let patientData=[]
 
-function handleFile(e){
+function readFile(file){
 
-const file=e.target.files[0]
 const reader=new FileReader()
 
 reader.onload=function(evt){
@@ -167,6 +198,9 @@ let map={}
 for(let i=startRow;i<rows.length;i++){
 
 const r=rows[i]
+
+if(r.includes("수진자명")||r.includes("환자명")) continue
+
 if(!r[nameIndex]) continue
 
 let name=r[nameIndex]
@@ -218,7 +252,9 @@ patientData.forEach(p=>{
 
 if(filter=="1" && p.count!=1) return
 if(filter=="2" && p.count!=2) return
-if(filter=="3" && p.count<3) return
+if(filter=="3" && p.count!=3) return
+if(filter=="4" && p.count!=4) return
+if(filter=="5" && p.count<5) return
 
 let tr=document.createElement("tr")
 
