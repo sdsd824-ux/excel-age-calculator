@@ -1,71 +1,63 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8" />
-<title>만 나이 계산기</title>
+<meta charset="UTF-8">
+<title>엑셀 만나이 계산</title>
+
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 
 body{
-  font-family: Arial, sans-serif;
-  background:#f5f7fb;
-  margin:0;
+margin:0;
+font-family:Arial;
+background:#f6f8fb;
 }
 
 .header{
-  text-align:center;
-  padding:60px 20px 30px;
+text-align:center;
+padding:70px 20px 30px;
 }
 
-.header h1{
-  margin:10px 0;
+.title{
+font-size:26px;
 }
 
 .container{
-  width:900px;
-  margin:auto;
+width:1000px;
+margin:40px auto;
 }
 
-.upload-area{
-  display:flex;
-  gap:30px;
-  margin-top:40px;
+.upload-box{
+background:white;
+border:2px dashed #cfcfcf;
+border-radius:14px;
+padding:60px;
+text-align:center;
+transition:.2s;
+cursor:pointer;
 }
 
-.box{
-  flex:1;
-  border:2px dashed #cfcfcf;
-  border-radius:12px;
-  padding:40px;
-  text-align:center;
-  background:white;
-  transition:0.2s;
-}
-
-.box:hover{
-  background:#eef4ff;
-}
-
-.fileInput{
-  margin-top:20px;
+.upload-box.dragover{
+background:#eef4ff;
+border-color:#6ea8ff;
 }
 
 table{
-  border-collapse: collapse;
-  width:100%;
-  margin-top:40px;
-  background:white;
+width:100%;
+border-collapse: collapse;
+margin-top:40px;
+background:white;
 }
 
-th, td{
-  border:1px solid #ddd;
-  padding:8px;
-  text-align:center;
+th,td{
+border:1px solid #ddd;
+padding:8px;
+text-align:center;
 }
 
 th{
-  background:#f0f0f0;
+background:#f1f3f5;
 }
 
 </style>
@@ -74,88 +66,104 @@ th{
 <body>
 
 <div class="header">
-  <h1>만 나이 계산 시스템</h1>
-  <p>엑셀 파일을 업로드하면 자동으로 계산됩니다</p>
+<div class="title">엑셀 만나이 계산</div>
 </div>
 
 <div class="container">
 
-  <div class="upload-area">
+<div id="dropZone" class="upload-box">
+파일을 여기에 드래그하거나 클릭하여 업로드
+<br><br>
+<input type="file" id="upload" hidden>
+</div>
 
-    <div class="box">
-      <h3>엑셀 업로드</h3>
-      <p>파일을 선택하세요</p>
-      <input type="file" id="upload" class="fileInput"/>
-    </div>
-
-    <div class="box">
-      <h3>설명</h3>
-      <p>엑셀에 <b>출생연도</b> 컬럼이 있어야 합니다</p>
-      <p>자동으로 만나이가 계산됩니다</p>
-    </div>
-
-  </div>
-
-  <div id="resultTable"></div>
+<div id="resultTable"></div>
 
 </div>
 
 <script>
 
-document.getElementById('upload').addEventListener('change', function(e) {
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("upload");
 
-  const reader = new FileReader();
-
-  reader.onload = function(event) {
-
-    const data = new Uint8Array(event.target.result);
-    const workbook = XLSX.read(data, {type: 'array'});
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
-
-    const today = new Date();
-    const currentYear = today.getFullYear();
-
-    const birthCol = "출생연도";
-
-    const result = json.map(row => {
-      const birthYear = row[birthCol] || null;
-      const age = birthYear ? currentYear - birthYear : null;
-      return {...row, 만나이: age};
-    });
-
-    const tableDiv = document.getElementById('resultTable');
-
-    if(result.length === 0){
-      tableDiv.innerHTML = "<p>데이터가 없습니다.</p>";
-      return;
-    }
-
-    let html = '<table>';
-
-    html += '<tr>';
-    for (const key in result[0]) {
-      html += `<th>${key}</th>`;
-    }
-    html += '</tr>';
-
-    result.forEach(row => {
-      html += '<tr>';
-      for (const key in row) {
-        html += `<td>${row[key] !== undefined ? row[key] : ""}</td>`;
-      }
-      html += '</tr>';
-    });
-
-    html += '</table>';
-
-    tableDiv.innerHTML = html;
-
-  };
-
-  reader.readAsArrayBuffer(e.target.files[0]);
-
+dropZone.addEventListener("click",()=>{
+fileInput.click();
 });
+
+fileInput.addEventListener("change",(e)=>{
+handleFile(e.target.files[0]);
+});
+
+dropZone.addEventListener("dragover",(e)=>{
+e.preventDefault();
+dropZone.classList.add("dragover");
+});
+
+dropZone.addEventListener("dragleave",()=>{
+dropZone.classList.remove("dragover");
+});
+
+dropZone.addEventListener("drop",(e)=>{
+e.preventDefault();
+dropZone.classList.remove("dragover");
+handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file){
+
+const reader = new FileReader();
+
+reader.onload = function(event){
+
+const data = new Uint8Array(event.target.result);
+const workbook = XLSX.read(data,{type:'array'});
+const sheet = workbook.Sheets[workbook.SheetNames[0]];
+const json = XLSX.utils.sheet_to_json(sheet);
+
+const currentYear = new Date().getFullYear();
+
+const result = json.map(row=>{
+const birthYear = row["출생연도"];
+const age = birthYear ? currentYear - birthYear : "";
+return {...row, 만나이:age};
+});
+
+renderTable(result);
+
+};
+
+reader.readAsArrayBuffer(file);
+
+}
+
+function renderTable(data){
+
+if(data.length===0){
+document.getElementById("resultTable").innerHTML="데이터 없음";
+return;
+}
+
+let html="<table>";
+
+html+="<tr>";
+for(const key in data[0]){
+html+=`<th>${key}</th>`;
+}
+html+="</tr>";
+
+data.forEach(row=>{
+html+="<tr>";
+for(const key in row){
+html+=`<td>${row[key]??""}</td>`;
+}
+html+="</tr>";
+});
+
+html+="</table>";
+
+document.getElementById("resultTable").innerHTML=html;
+
+}
 
 </script>
 
