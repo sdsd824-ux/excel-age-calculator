@@ -1,25 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>만 나이 계산기</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <style>
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    th, td { border: 1px solid #333; padding: 5px; text-align: center; }
-    th { background-color: #f0f0f0; }
-  </style>
+<meta charset="UTF-8" />
+<title>만 나이 계산기</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+  font-family: Arial, sans-serif;
+  background:#f5f7fb;
+  margin:0;
+}
+
+.header{
+  text-align:center;
+  padding:60px 20px 30px;
+}
+
+.header h1{
+  margin:10px 0;
+}
+
+.container{
+  width:900px;
+  margin:auto;
+}
+
+.upload-area{
+  display:flex;
+  gap:30px;
+  margin-top:40px;
+}
+
+.box{
+  flex:1;
+  border:2px dashed #cfcfcf;
+  border-radius:12px;
+  padding:40px;
+  text-align:center;
+  background:white;
+  transition:0.2s;
+}
+
+.box:hover{
+  background:#eef4ff;
+}
+
+.fileInput{
+  margin-top:20px;
+}
+
+table{
+  border-collapse: collapse;
+  width:100%;
+  margin-top:40px;
+  background:white;
+}
+
+th, td{
+  border:1px solid #ddd;
+  padding:8px;
+  text-align:center;
+}
+
+th{
+  background:#f0f0f0;
+}
+
+</style>
 </head>
+
 <body>
 
-<h2>엑셀 업로드 (출생연도 기준 만나이 계산)</h2>
-<input type="file" id="upload" />
-<div id="resultTable"></div>
+<div class="header">
+  <h1>만 나이 계산 시스템</h1>
+  <p>엑셀 파일을 업로드하면 자동으로 계산됩니다</p>
+</div>
+
+<div class="container">
+
+  <div class="upload-area">
+
+    <div class="box">
+      <h3>엑셀 업로드</h3>
+      <p>파일을 선택하세요</p>
+      <input type="file" id="upload" class="fileInput"/>
+    </div>
+
+    <div class="box">
+      <h3>설명</h3>
+      <p>엑셀에 <b>출생연도</b> 컬럼이 있어야 합니다</p>
+      <p>자동으로 만나이가 계산됩니다</p>
+    </div>
+
+  </div>
+
+  <div id="resultTable"></div>
+
+</div>
 
 <script>
+
 document.getElementById('upload').addEventListener('change', function(e) {
+
   const reader = new FileReader();
+
   reader.onload = function(event) {
+
     const data = new Uint8Array(event.target.result);
     const workbook = XLSX.read(data, {type: 'array'});
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -36,21 +124,21 @@ document.getElementById('upload').addEventListener('change', function(e) {
       return {...row, 만나이: age};
     });
 
-    // 웹페이지에 표로 출력
     const tableDiv = document.getElementById('resultTable');
+
     if(result.length === 0){
       tableDiv.innerHTML = "<p>데이터가 없습니다.</p>";
       return;
     }
 
     let html = '<table>';
-    // 헤더
+
     html += '<tr>';
     for (const key in result[0]) {
       html += `<th>${key}</th>`;
     }
     html += '</tr>';
-    // 데이터 행
+
     result.forEach(row => {
       html += '<tr>';
       for (const key in row) {
@@ -58,12 +146,17 @@ document.getElementById('upload').addEventListener('change', function(e) {
       }
       html += '</tr>';
     });
+
     html += '</table>';
+
     tableDiv.innerHTML = html;
 
   };
+
   reader.readAsArrayBuffer(e.target.files[0]);
+
 });
+
 </script>
 
 </body>
