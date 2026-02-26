@@ -32,11 +32,12 @@ color:#666;
 
 .upload{
 border:2px dashed #bfc7d9;
-padding:40px;
+padding:60px;
 text-align:center;
 background:white;
 border-radius:12px;
 margin-bottom:40px;
+font-size:20px;
 transition:.2s;
 }
 
@@ -79,6 +80,14 @@ font-weight:bold;
 margin:20px 0;
 font-size:18px;
 }
+
+.monthBox{
+margin-top:30px;
+font-size:18px;
+background:white;
+padding:20px;
+border-radius:10px;
+}
 </style>
 </head>
 
@@ -90,6 +99,8 @@ font-size:18px;
 <div class="sub">엑셀 파일을 넣으면 자동 분석됩니다</div>
 
 <div class="upload" id="dropZone">
+엑셀 파일 드래그 또는 클릭
+<br><br>
 <input type="file" id="excelFile">
 </div>
 
@@ -115,19 +126,21 @@ N차 필터
 <th>방문횟수</th>
 <th>첫 방문</th>
 <th>마지막 방문</th>
+<th>마지막 방문 후 경과일</th>
+<th>평균 방문 간격</th>
 </tr>
 </thead>
 <tbody></tbody>
 </table>
 
+<div class="monthBox" id="monthStats"></div>
+
 </div>
 
 <script>
 
-const fileInput = document.getElementById('excelFile')
-const dropZone = document.getElementById('dropZone')
-
-fileInput.addEventListener('change', handleFile)
+const fileInput=document.getElementById("excelFile")
+const dropZone=document.getElementById("dropZone")
 
 dropZone.addEventListener("dragover",e=>{
 e.preventDefault()
@@ -141,9 +154,7 @@ dropZone.classList.remove("dragover")
 dropZone.addEventListener("drop",e=>{
 e.preventDefault()
 dropZone.classList.remove("dragover")
-
-const file=e.dataTransfer.files[0]
-readFile(file)
+readFile(e.dataTransfer.files[0])
 })
 
 fileInput.addEventListener("change",e=>{
@@ -151,6 +162,7 @@ readFile(e.target.files[0])
 })
 
 let patientData=[]
+let allVisits=[]
 
 function readFile(file){
 
@@ -159,9 +171,8 @@ const reader=new FileReader()
 reader.onload=function(evt){
 
 const data=new Uint8Array(evt.target.result)
-const workbook=XLSX.read(data,{type:'array'})
+const workbook=XLSX.read(data,{type:"array"})
 const sheet=workbook.Sheets[workbook.SheetNames[0]]
-
 const rows=XLSX.utils.sheet_to_json(sheet,{header:1})
 
 analyze(rows)
@@ -194,29 +205,25 @@ let dateIndex=headers.findIndex(h=>h=="내원일"||h=="날짜")
 let chartIndex=headers.findIndex(h=>h=="차트번호")
 
 let map={}
+allVisits=[]
 
 for(let i=startRow;i<rows.length;i++){
 
 const r=rows[i]
 
 if(r.includes("수진자명")||r.includes("환자명")) continue
-
 if(!r[nameIndex]) continue
 
 let name=r[nameIndex]
-let date=new Date(r[dateIndex])
 let chart=r[chartIndex]||"-"
+let date=new Date(r[dateIndex])
 
 if(!map[name]){
-
-map[name]={
-chart:chart,
-visits:[]
-}
-
+map[name]={chart,visits:[]}
 }
 
 map[name].visits.push(date)
+allVisits.push(date)
 
 }
 
@@ -224,17 +231,40 @@ patientData=Object.entries(map).map(([name,obj])=>{
 
 obj.visits.sort((a,b)=>a-b)
 
+let avg=0
+
+if(obj.visits.length>1){
+
+let sum=0
+
+for(let i=1;i<obj.visits.length;i++){
+
+sum+=(obj.visits[i]-obj.visits[i-1])
+
+}
+
+avg=Math.round(sum/(obj.visits.length-1)/86400000)
+
+}
+
+let last=obj.visits[obj.visits.length-1]
+let today=new Date()
+let gap=Math.floor((today-last)/86400000)
+
 return{
 name,
 chart:obj.chart,
 count:obj.visits.length,
 first:obj.visits[0],
-last:obj.visits[obj.visits.length-1]
+last:last,
+gap,
+avg
 }
 
 })
 
 render()
+monthCalc()
 
 }
 
@@ -250,11 +280,11 @@ let revisit=patientData.filter(p=>p.count>1).length
 
 patientData.forEach(p=>{
 
-if(filter=="1" && p.count!=1) return
-if(filter=="2" && p.count!=2) return
-if(filter=="3" && p.count!=3) return
-if(filter=="4" && p.count!=4) return
-if(filter=="5" && p.count<5) return
+if(filter=="1"&&p.count!=1) return
+if(filter=="2"&&p.count!=2) return
+if(filter=="3"&&p.count!=3) return
+if(filter=="4"&&p.count!=4) return
+if(filter=="5"&&p.count<5) return
 
 let tr=document.createElement("tr")
 
@@ -266,6 +296,8 @@ tr.innerHTML=`
 <td>${p.count}</td>
 <td>${format(p.first)}</td>
 <td>${format(p.last)}</td>
+<td>${p.gap}일</td>
+<td>${p.avg? p.avg+"일": "-"}</td>
 `
 
 tbody.appendChild(tr)
@@ -277,6 +309,30 @@ document.getElementById("stats").innerHTML=`
 재방문 환자 : ${revisit}명<br>
 재방문율 : ${((revisit/total)*100).toFixed(1)}%
 `
+
+}
+
+function monthCalc(){
+
+let map={}
+
+allVisits.forEach(d=>{
+
+let key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")
+
+if(!map[key]) map[key]=0
+
+map[key]++
+
+})
+
+let html="<b>월별 치료 횟수</b><br><br>"
+
+Object.keys(map).sort().forEach(m=>{
+html+=m+" : "+map[m]+"회<br>"
+})
+
+document.getElementById("monthStats").innerHTML=html
 
 }
 
